@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newton mozgástörvényei – animált példákkal</title>
+<style>
+  :root{
+    --bg:#0b1226; --card:#131c38; --card2:#18234a; --line:#2a3a63;
+    --text:#e8ecf8; --muted:#9aa8cc;
+    --c1:#4cc9f0; --c2:#f9c74f; --c3:#f72585;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:radial-gradient(1200px 600px at 20% -10%, #1a2a5a 0%, var(--bg) 60%) fixed;
+    color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; line-height:1.6;
+  }
+  .wrap{max-width:900px; margin:0 auto; padding:0 18px 60px}
+
+  /* ===== Fejléc ===== */
+  header{padding:48px 0 18px; text-align:center}
+  header h1{margin:0 0 8px; font-size:clamp(28px,5vw,44px); letter-spacing:.5px}
+  header p{margin:0 auto; max-width:620px; color:var(--muted)}
+  nav{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:22px 0 6px}
+  nav a{
+    color:var(--text); text-decoration:none; padding:8px 14px; border-radius:999px;
+    border:1px solid var(--line); background:var(--card); font-size:14px; transition:.2s;
+  }
+  nav a:hover{transform:translateY(-2px); border-color:var(--muted)}
+  .pause{
+    display:inline-flex; align-items:center; gap:8px; margin-top:14px; cursor:pointer;
+    color:var(--muted); font-size:14px; user-select:none;
+  }
+  .pause input{accent-color:var(--c1); width:18px; height:18px}
+
+  /* Szünet gomb: minden animáció megáll */
+  body:has(#pause:checked) *,
+  body:has(#pause:checked) *::before,
+  body:has(#pause:checked) *::after{animation-play-state:paused !important}
+
+  /* ===== Szekciók ===== */
+  section{
+    margin-top:34px; padding:26px; border-radius:20px;
+    background:linear-gradient(180deg,var(--card),#10182f);
+    border:1px solid var(--line);
+  }
+  section#t1{--c:var(--c1)} section#t2{--c:var(--c2)} section#t3{--c:var(--c3)}
+  .tag{
+    display:inline-block; font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+    color:#0b1226; background:var(--c); padding:3px 10px; border-radius:999px;
+  }
+  h2{margin:10px 0 6px; font-size:clamp(22px,3.5vw,30px)}
+  h3{margin:26px 0 8px; font-size:17px; color:var(--c)}
+  .law{
+    margin:14px 0; padding:14px 18px; border-left:4px solid var(--c);
+    background:var(--card2); border-radius:0 12px 12px 0;
+  }
+  .formula{
+    display:inline-block; margin:6px 0 0; padding:6px 16px; border-radius:10px;
+    font-family:"Cambria Math","STIX Two Math",Georgia,serif; font-size:24px; font-weight:700;
+    color:var(--c); background:rgba(255,255,255,.05); border:1px dashed var(--c);
+  }
+  p{margin:8px 0}
+  .cap{font-size:13.5px; color:var(--muted); margin:8px 2px 0}
+  ul.ex{padding-left:20px; margin:8px 0}
+  ul.ex li{margin:4px 0}
+
+  /* ===== Közös színpad ===== */
+  .scene{
+    container-type:inline-size; position:relative; height:160px; overflow:hidden;
+    border-radius:14px; border:1px solid var(--line);
+    background:linear-gradient(#16213e,#0f1a33);
+  }
+  .scene.tall{height:auto}
+  .ground{position:absolute; left:0; right:0; bottom:0; height:30px; background:#24304f; border-top:2px solid #3a4b7a}
+  .ground.ice{
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.5) 0 2px, transparent 2px 10cqw),
+      linear-gradient(#7fb7d9,#4f86ad);
+    border-top-color:#bfe6ff;
+  }
+  .scene-title{
+    position:absolute; top:8px; left:12px; font-size:12px; color:var(--muted);
+    letter-spacing:.5px; z-index:3;
+  }
+
+  /* közös áttűnés: minden ciklus végén eltűnik, majd újraindul */
+  @keyframes fade{0%{opacity:0}4%{opacity:1}90%{opacity:1}97%{opacity:0}100%{opacity:0}}
+
+  /* ====================================================
+     1. TÖRVÉNY – a) korong a jégen
+  ==================================================== */
+  .puck{
+    position:absolute; bottom:30px; width:50px; height:16px; border-radius:6px;
+    background:linear-gradient(#333,#0a0a0a); border:1px solid #000;
+    animation:slide 5s linear infinite;
+  }
+  .puck::after{
+    content:"v ⟶"; position:absolute; bottom:calc(100% + 6px); left:6px;
+    font-size:13px; font-weight:700; color:var(--c1); white-space:nowrap;
+  }
+  @keyframes slide{from{left:-70px}to{left:100cqw}}
+
+  /* ====================================================
+     1. TÖRVÉNY – b) kiskocsi és a rajta lévő golyó
+     Ciklus: 6 s. 0–30%: a kocsi halad, 30%: nekiütközik az akadálynak,
+     a golyó viszont tovább megy (tehetetlenség) és leesik.
+  ==================================================== */
+  .cart{
+    position:absolute; bottom:30px; width:90px; height:42px;
+    animation:cartx 6s linear infinite, fade 6s linear infinite;
+  }
+  .cart::before{
+    content:""; position:absolute; left:0; right:0; top:0; height:30px;
+    background:linear-gradient(#ff7a4d,#e4572e); border-radius:6px 6px 3px 3px;
+  }
+  .cart i{
+    position:absolute; bottom:0; width:20px; height:20px; border-radius:50%;
+    background:radial-gradient(circle,#999 0 25%,#222 27%); border:2px solid #111;
+  }
+  .cart i:nth-child(1){left:8px} .cart i:nth-child(2){right:8px}
+  @keyframes cartx{0%{left:3cqw}30%{left:48cqw}100%{left:48cqw}}
+
+  .block{
+    position:absolute; bottom:30px; left:calc(48cqw + 90px); width:14px; height:16px;
+    background:#8892b0; border-radius:3px 3px 0 0;
+  }
+  .ball{
+    position:absolute; width:22px; height:22px; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%,#fff,var(--c1) 45%,#0a6f94);
+    animation:ballx 6s linear infinite, bally 6s linear infinite, fade 6s linear infinite;
+  }
+  @keyframes ballx{
+    0%{left:calc(3cqw + 34px)}
+    30%{left:calc(48cqw + 34px)}
+    47%{left:calc(73.5cqw + 34px)}
+    100%{left:calc(73.5cqw + 34px)}
+  }
+  @keyframes bally{
+    0%{bottom:72px}
+    30%{bottom:72px; animation-timing-function:cubic-bezier(.3333,0,.6667,.3333)}
+    47%{bottom:30px}
+    100%{bottom:30px}
+  }
+
+  /* ====================================================
+     2. TÖRVÉNY – ugyanakkora erő, különböző tömeg
+     Egyenletesen gyorsuló mozgás: s = ½·a·t²  →  ease-in-quad
+  ==================================================== */
+  .lane{position:relative; height:100px; border-bottom:2px solid #3a4b7a}
+  .lane + .lane{background:rgba(255,255,255,.02)}
+  .lane .lbl{
+    position:absolute; top:8px; left:12px; font-size:12.5px; color:var(--text);
+    background:rgba(0,0,0,.25); padding:2px 8px; border-radius:6px; z-index:2;
+  }
+  .finish{
+    position:absolute; right:56px; top:0; bottom:0; width:0; border-right:3px dashed var(--c2); opacity:.8;
+  }
+  .box{
+    position:absolute; bottom:2px; border-radius:6px; display:grid; place-items:center;
+    font-weight:700; color:#0b1226; font-size:13px;
+  }
+  .box::before{
+    content:"F ⟶"; position:absolute; right:calc(100% + 4px); top:50%; transform:translateY(-50%);
+    color:var(--c2); font-size:13px; white-space:nowrap;
+  }
+  .box.light{
+    width:40px; height:40px; background:linear-gradient(#ffe69a,#f9c74f);
+    animation:accL 6s infinite, fade 6s linear infinite;
+  }
+  .box.heavy{
+    width:70px; height:62px; background:linear-gradient(#ffb27a,#f3722c);
+    animation:accH 6s infinite, fade 6s linear infinite;
+  }
+  @keyframes accL{
+    0%{left:calc(4cqw + 30px); animation-timing-function:cubic-bezier(.3333,0,.6667,.3333)}
+    33.33%{left:calc(100cqw - 100px)}
+    100%{left:calc(100cqw - 100px)}
+  }
+  @keyframes accH{
+    0%{left:4cqw; animation-timing-function:cubic-bezier(.3333,0,.6667,.3333)}
+    66.67%{left:calc(100cqw - 130px)}
+    100%{left:calc(100cqw - 130px)}
+  }
+
+  /* ====================================================
+     3. TÖRVÉNY – korcsolyázók és Newton-bölcső
+  ==================================================== */
+  .sk{
+    position:absolute; bottom:30px; width:var(--w,34px); height:var(--h,70px);
+    animation:fade 7s linear infinite;
+  }
+  .sk::before{
+    content:""; position:absolute; left:50%; top:0; width:calc(var(--w,34px) * .65); aspect-ratio:1;
+    transform:translateX(-50%); border-radius:50%; background:#ffd6a5;
+  }
+  .sk::after{
+    content:""; position:absolute; left:0; right:0; top:calc(var(--w,34px) * .7); bottom:0;
+    border-radius:14px 14px 4px 4px; background:var(--col);
+  }
+  .sk span{
+    position:absolute; left:0; right:0; top:calc(var(--w,34px) * .85); z-index:2;
+    text-align:center; font-size:11px; font-weight:700; color:#fff;
+  }
+  .row{position:relative; height:130px; border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row .scene-title{z-index:4}
+
+  /* sor 1: egyenlő tömeg – ugyanakkora sebesség */
+  .a1{--col:#4361ee; left:calc(50cqw - 38px); animation:fade 7s linear infinite, a1m 7s linear infinite}
+  .b1{--col:#f72585; left:calc(50cqw + 4px);  animation:fade 7s linear infinite, b1m 7s linear infinite}
+  @keyframes a1m{0%,12%{left:calc(50cqw - 38px)}90%{left:calc(50cqw - 38px - 38cqw)}100%{left:calc(50cqw - 38px - 38cqw)}}
+  @keyframes b1m{0%,12%{left:calc(50cqw + 4px)}90%{left:calc(50cqw + 4px + 38cqw)}100%{left:calc(50cqw + 4px + 38cqw)}}
+
+  /* sor 2: a nehezebb lassabb, a könnyebb kétszer gyorsabb (lendületmegmaradás) */
+  .a2{--w:46px; --h:82px; --col:#4361ee; left:calc(50cqw - 50px); animation:fade 7s linear infinite, a2m 7s linear infinite}
+  .b2{--w:30px; --h:62px; --col:#f72585; left:calc(50cqw + 4px);  animation:fade 7s linear infinite, b2m 7s linear infinite}
+  @keyframes a2m{0%,12%{left:calc(50cqw - 50px)}90%{left:calc(50cqw - 50px - 18cqw)}100%{left:calc(50cqw - 50px - 18cqw)}}
+  @keyframes b2m{0%,12%{left:calc(50cqw + 4px)}90%{left:calc(50cqw + 4px + 36cqw)}100%{left:calc(50cqw + 4px + 36cqw)}}
+
+  .push{
+    position:absolute; left:50%; top:26px; transform:translateX(-50%); z-index:3;
+    font-weight:800; font-size:15px; color:var(--c3); white-space:nowrap; opacity:0;
+    animation:flash 7s linear infinite; text-shadow:0 0 10px rgba(247,37,133,.6);
+  }
+  @keyframes flash{0%,9%{opacity:0}11%,17%{opacity:1}20%,100%{opacity:0}}
+
+  /* Newton-bölcső */
+  .cradle-scene{height:230px; display:grid; place-items:center}
+  .cradle{position:relative; width:180px; height:170px; margin-top:16px}
+  .cradle::before{
+    content:""; position:absolute; top:-6px; left:-24px; right:-24px; height:8px;
+    background:linear-gradient(#aab4d4,#6b7aa8); border-radius:4px;
+  }
+  .pend{
+    position:absolute; top:0; width:36px; height:150px; transform-origin:50% 0;
+  }
+  .pend::before{ /* fonal */
+    content:""; position:absolute; left:50%; top:0; bottom:34px; width:2px; margin-left:-1px; background:#cfd6ee;
+  }
+  .pend::after{ /* golyó */
+    content:""; position:absolute; left:0; bottom:0; width:36px; height:36px; border-radius:50%;
+    background:radial-gradient(circle at 32% 28%,#fff,#c8d0ea 35%,#6c7aa6 80%);
+    box-shadow:0 4px 8px rgba(0,0,0,.4);
+  }
+  .pend:nth-child(1){left:0;   animation:swingL 2.4s infinite}
+  .pend:nth-child(2){left:36px}
+  .pend:nth-child(3){left:72px}
+  .pend:nth-child(4){left:108px}
+  .pend:nth-child(5){left:144px; animation:swingR 2.4s infinite}
+  @keyframes swingL{
+    0%{transform:rotate(38deg); animation-timing-function:cubic-bezier(.45,0,1,1)}
+    25%{transform:rotate(0)}
+    75%{transform:rotate(0); animation-timing-function:cubic-bezier(0,0,.55,1)}
+    100%{transform:rotate(38deg)}
+  }
+  @keyframes swingR{
+    0%,25%{transform:rotate(0); animation-timing-function:cubic-bezier(0,0,.55,1)}
+    50%{transform:rotate(-38deg); animation-timing-function:cubic-bezier(.45,0,1,1)}
+    75%,100%{transform:rotate(0)}
+  }
+
+  /* ===== Interaktív labor ===== */
+  section#lab{--c:#7bf1a8} section#kviz{--c:#c3a6ff}
+  .controls{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px 22px; margin:14px 0}
+  .ctl label{display:flex; justify-content:space-between; font-size:14px; color:var(--muted)}
+  .ctl output{color:var(--text); font-weight:700}
+  .ctl input[type=range]{width:100%; accent-color:var(--c)}
+  .btns{display:flex; gap:10px; flex-wrap:wrap; margin:10px 0}
+  button.btn{
+    cursor:pointer; border:1px solid var(--c); background:transparent; color:var(--c);
+    padding:9px 16px; border-radius:10px; font-size:15px; font-weight:700; transition:.15s;
+  }
+  button.btn:hover{background:rgba(255,255,255,.07)}
+  button.btn.on{background:var(--c); color:#0b1226}
+  #sim{height:190px}
+  #simGround{
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.45) 0 2px, transparent 2px 40px),
+      #24304f;
+  }
+  #simBox{
+    position:absolute; left:25%; bottom:30px; border-radius:6px;
+    background:linear-gradient(#b9f6ca,#4cc38a); display:grid; place-items:center;
+    color:#0b1226; font-weight:800; font-size:13px; z-index:2;
+  }
+  .arr{position:absolute; height:6px; border-radius:3px; z-index:3; display:none}
+  .arr::after{
+    content:""; position:absolute; right:-9px; top:-6px; border-left:12px solid currentColor;
+    border-top:9px solid transparent; border-bottom:9px solid transparent;
+  }
+  #fArrow{color:var(--c2); background:var(--c2)}
+  #vArrow{color:var(--c1); background:var(--c1)}
+  .arrlbl{position:absolute; z-index:3; font-size:12px; font-weight:700; display:none}
+  .readouts{display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; margin-top:12px}
+  .ro{background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:8px 12px}
+  .ro small{display:block; color:var(--muted); font-size:12px}
+  .ro b{font-size:19px; font-variant-numeric:tabular-nums}
+  #status{
+    margin-top:12px; padding:10px 14px; border-radius:10px; background:rgba(123,241,168,.1);
+    border:1px dashed var(--c); font-size:14.5px; min-height:44px;
+  }
+
+  /* ===== Kvíz ===== */
+  .q{margin:18px 0; padding:14px 16px; background:var(--card2); border-radius:14px; border:1px solid var(--line)}
+  .q p{margin:0 0 10px}
+  .opts{display:flex; flex-direction:column; gap:8px}
+  .opts button{
+    text-align:left; cursor:pointer; padding:9px 14px; border-radius:10px; font-size:15px;
+    color:var(--text); background:rgba(255,255,255,.04); border:1px solid var(--line); transition:.15s;
+  }
+  .opts button:hover{border-color:var(--c)}
+  .opts button.ok{background:rgba(76,195,138,.25); border-color:#4cc38a}
+  .opts button.bad{background:rgba(247,37,133,.2); border-color:var(--c3)}
+  .fb{margin:10px 0 0 !important; font-size:14px; color:var(--muted); min-height:20px}
+  #score{font-weight:700; color:var(--c)}
+
+  /* ===== Élő (JS-vezérelt) elemek ===== */
+  .cart.live,.ball.live,.sk.live,.box.live{animation:none !important}
+  .status{
+    margin-top:12px; padding:10px 14px; border-radius:10px; background:rgba(255,255,255,.05);
+    border:1px dashed var(--c); font-size:14.5px; min-height:44px;
+  }
+  button.btn:disabled{opacity:.35; cursor:not-allowed}
+  .box.p1{background:linear-gradient(#ffe69a,#f9c74f)}
+  .box.p2{background:linear-gradient(#ffb27a,#f3722c)}
+  .sk.cA{--col:#4361ee}
+  .sk.cB{--col:#f72585}
+  .pushlive{
+    position:absolute; left:50%; top:30px; transform:translateX(-50%); z-index:4;
+    font-weight:800; font-size:15px; color:var(--c3); white-space:nowrap; opacity:0;
+    text-shadow:0 0 10px rgba(247,37,133,.6);
+  }
+
+  /* ===== Összefoglaló táblázat ===== */
+  table{width:100%; border-collapse:collapse; margin-top:12px; font-size:15px}
+  th,td{padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top}
+  th{color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:1px}
+  td:first-child{font-weight:700; white-space:nowrap}
+  tr:nth-child(2) td:first-child{color:var(--c1)}
+  tr:nth-child(3) td:first-child{color:var(--c2)}
+  tr:nth-child(4) td:first-child{color:var(--c3)}
+  footer{text-align:center; color:var(--muted); font-size:13px; margin-top:30px}
+
+  @media (max-width:560px){
+    section{padding:18px}
+    .formula{font-size:20px}
+    td:first-child{white-space:normal}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Newton mozgástörvényei</h1>
+    <p>Három egyszerű törvény, amely megmagyarázza, miért mozog (vagy miért nem mozog) minden körülöttünk. Mindegyikhez egy animált példa tartozik.</p>
+    <nav>
+      <a href="#t1">1. Tehetetlenség</a>
+      <a href="#t2">2. Dinamika alaptörvénye</a>
+      <a href="#t3">3. Hatás–ellenhatás</a>
+      <a href="#lab">Interaktív labor</a>
+      <a href="#kviz">Kvíz</a>
+      <a href="#osszegzes">Összefoglalás</a>
+    </nav>
+    <label class="pause"><input type="checkbox" id="pause"> Animációk szüneteltetése</label>
+  </header>
+
+  <!-- ================= 1. TÖRVÉNY ================= -->
+  <section id="t1">
+    <span class="tag">1. törvény</span>
+    <h2>A tehetetlenség törvénye</h2>
+    <div class="law">
+      <p>Minden test megtartja nyugalmi állapotát vagy egyenes vonalú egyenletes mozgását mindaddig, amíg egy másik test (külső erő) ennek megváltoztatására nem kényszeríti.</p>
+      <span class="formula">ΣF = 0 &nbsp;⇒&nbsp; v = állandó</span>
+    </div>
+
+    <h3>A) Korong a súrlódásmentes jégen</h3>
+    <div class="scene">
+      <span class="scene-title">Nem hat rá eredő erő → a sebessége nem változik</span>
+      <div class="puck"></div>
+      <div class="ground ice"></div>
+    </div>
+    <p class="cap">A jégen lévő jelek egyenlő távolságra vannak egymástól. A korong egyenlő idők alatt mindig egyenlő utat tesz meg, vagyis nem gyorsul és nem lassul.</p>
+
+    <h3>B) Kiskocsi és a rajta lévő golyó</h3>
+    <div class="scene">
+      <span class="scene-title">Fékezés: a kocsi megáll, a golyó tovább megy</span>
+      <div class="block"></div>
+      <div class="cart"><i></i><i></i></div>
+      <div class="ball"></div>
+      <div class="ground"></div>
+    </div>
+    <p class="cap">Amikor a kocsi az akadálynak ütközik, a golyóra nem hat vízszintes erő, ezért megtartja az előző sebességét. A függőleges irányú mozgását közben a gravitáció változtatja meg.</p>
+
+    <h3>Próbáld ki: te fékezel!</h3>
+    <p>Indítsd el a kocsit, és nyomd meg a <strong>Fékezés!</strong> gombot, amikor akarod. Figyeld, mit csinál a golyó, és hová esik le.</p>
+    <div class="controls">
+      <div class="ctl">
+        <label for="s1v">A kocsi sebessége <output id="o1v">3 m/s</output></label>
+        <input type="range" id="s1v" min="1" max="6" step="0.5" value="3">
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="b1go" type="button">▶ Indítás</button>
+      <button class="btn" id="b1stop" type="button" disabled>🛑 Fékezés!</button>
+    </div>
+    <div class="scene" id="sim1">
+      <span class="scene-title">A kocsi hirtelen megáll, a golyót viszont nem fékezi semmi vízszintesen</span>
+      <div class="cart live" id="s1cart"><i></i><i></i></div>
+      <div class="ball live" id="s1ball"></div>
+      <div class="ground"></div>
+    </div>
+    <div class="status" id="s1st">Állítsd be a sebességet, majd indítsd el a kocsit!</div>
+
+    <h3>Hétköznapi példák</h3>
+    <ul class="ex">
+      <li>Hirtelen fékezéskor a buszban előreesünk.</li>
+      <li>Az abroszt gyorsan kihúzva az asztalról a poharak a helyükön maradnak.</li>
+      <li>Ezért kell bekötni a biztonsági övet.</li>
+    </ul>
+  </section>
+
+  <!-- ================= 2. TÖRVÉNY ================= -->
+  <section id="t2">
+    <span class="tag">2. törvény</span>
+    <h2>A dinamika alaptörvénye</h2>
+    <div class="law">
+      <p>A test gyorsulása egyenesen arányos a rá ható erők eredőjével, és fordítottan arányos a tömegével. A gyorsulás az erő irányába mutat.</p>
+      <span class="formula">F = m · a &nbsp;&nbsp;⇔&nbsp;&nbsp; a = F / m</span>
+    </div>
+
+    <h3>Verseny: ugyanakkora erő, különböző tömeg</h3>
+    <div class="scene tall">
+      <div class="lane">
+        <span class="lbl">m = 1 kg &nbsp;·&nbsp; a = 10 m/s² &nbsp;·&nbsp; 2 s alatt ér célba</span>
+        <div class="finish"></div>
+        <div class="box light">1 kg</div>
+      </div>
+      <div class="lane">
+        <span class="lbl">m = 4 kg &nbsp;·&nbsp; a = 2,5 m/s² &nbsp;·&nbsp; 4 s alatt ér célba</span>
+        <div class="finish"></div>
+        <div class="box heavy">4 kg</div>
+      </div>
+    </div>
+    <p class="cap">Mindkét testet F = 10 N erővel tolja valami ugyanazon 20 m-es úton. A négyszeres tömeg negyedakkora gyorsulást jelent. Mivel s = ½·a·t², a nehéz test kétszer annyi idő alatt ér célba. A mozgás egyenletesen gyorsuló: a doboz egyre gyorsabban halad.</p>
+
+    <h3>Próbáld ki: állítsd be a versenyzőket!</h3>
+    <p>Mindkét testet ugyanakkora erő tolja egy 20 m-es úton. Te döntöd el az erőt és a két tömeget. Jósold meg, ki nyer, mielőtt megnyomod a Rajtot!</p>
+    <div class="controls">
+      <div class="ctl">
+        <label for="s2F">Közös erő (F) <output id="o2F">20 N</output></label>
+        <input type="range" id="s2F" min="5" max="50" step="1" value="20">
+      </div>
+      <div class="ctl">
+        <label for="s2m1">1. test tömege <output id="o2m1">1 kg</output></label>
+        <input type="range" id="s2m1" min="1" max="10" step="0.5" value="1">
+      </div>
+      <div class="ctl">
+        <label for="s2m2">2. test tömege <output id="o2m2">4 kg</output></label>
+        <input type="range" id="s2m2" min="1" max="10" step="0.5" value="4">
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="b2go" type="button">🏁 Rajt!</button>
+      <button class="btn" id="b2reset" type="button">↺ Alaphelyzet</button>
+    </div>
+    <div class="scene tall" id="sim2">
+      <div class="lane">
+        <span class="lbl" id="s2l1"></span>
+        <div class="finish"></div>
+        <div class="box live p1" id="s2b1"></div>
+      </div>
+      <div class="lane">
+        <span class="lbl" id="s2l2"></span>
+        <div class="finish"></div>
+        <div class="box live p2" id="s2b2"></div>
+      </div>
+    </div>
+    <div class="readouts">
+      <div class="ro"><small>1. gyorsulás</small><b id="r2a1">–</b></div>
+      <div class="ro"><small>2. gyorsulás</small><b id="r2a2">–</b></div>
+      <div class="ro"><small>1. célba érési idő</small><b id="r2t1">–</b></div>
+      <div class="ro"><small>2. célba érési idő</small><b id="r2t2">–</b></div>
+      <div class="ro"><small>Eltelt idő</small><b id="r2t">0,00 s</b></div>
+    </div>
+    <div class="status" id="s2st">Állítsd be az erőt és a tömegeket, majd indítsd a versenyt!</div>
+
+    <h3>Hétköznapi példák</h3>
+    <ul class="ex">
+      <li>Az üres bevásárlókocsit könnyű megindítani, a megpakoltat nehéz.</li>
+      <li>Ugyanakkora rúgástól a focilabda gyorsabban gyorsul, mint egy medicinlabda.</li>
+      <li>A kisautó ugyanazzal a motorerővel gyorsabban gyorsul, mint a kamion.</li>
+    </ul>
+  </section>
+
+  <!-- ================= 3. TÖRVÉNY ================= -->
+  <section id="t3">
+    <span class="tag">3. törvény</span>
+    <h2>A hatás–ellenhatás törvénye</h2>
+    <div class="law">
+      <p>Ha egy test erőt fejt ki egy másik testre, akkor a második test is ugyanakkora nagyságú, de ellentétes irányú erőt fejt ki az elsőre. Az erő és az ellenerő mindig <strong>két különböző testen</strong> támad, ezért nem oltják ki egymást.</p>
+      <span class="formula">F₁₂ = −F₂₁</span>
+    </div>
+
+    <h3>A) Két korcsolyázó eltolja egymást</h3>
+    <div class="scene tall">
+      <div class="row">
+        <span class="scene-title">Egyenlő tömeg → egyenlő sebesség</span>
+        <div class="push">⟵ F &nbsp;&nbsp; F ⟶</div>
+        <div class="sk a1"><span>60 kg</span></div>
+        <div class="sk b1"><span>60 kg</span></div>
+        <div class="ground ice"></div>
+      </div>
+      <div class="row">
+        <span class="scene-title">Eltérő tömeg → a könnyebb gyorsabban távolodik</span>
+        <div class="push">⟵ F &nbsp;&nbsp; F ⟶</div>
+        <div class="sk a2"><span>80 kg</span></div>
+        <div class="sk b2"><span>40 kg</span></div>
+        <div class="ground ice"></div>
+      </div>
+    </div>
+    <p class="cap">Az erők ugyanakkorák, de a gyorsulás a = F/m, ezért a feleakkora tömegű korcsolyázó kétszer akkora sebességet kap. (Az erőhatás után a súrlódásmentes jégen mindkettő egyenletesen halad tovább.)</p>
+
+    <h3>B) Newton-bölcső</h3>
+    <div class="scene cradle-scene">
+      <div class="cradle">
+        <div class="pend"></div><div class="pend"></div><div class="pend"></div><div class="pend"></div><div class="pend"></div>
+      </div>
+    </div>
+    <p class="cap">Az első golyó erőt fejt ki a másodikra, az pedig ellenerőt az elsőre. Az erőhatás végigmegy a sorban, és az utolsó golyó ugrik ki. Közben a lendület és az energia is megmarad.</p>
+
+    <h3>Próbáld ki: lökd szét a korcsolyázókat!</h3>
+    <p>Válaszd ki a tömegeket és a lökőerőt. Az erő 0,3 másodpercig hat mindkét korcsolyázóra, egyformán, de ellentétes irányban. Ki gyorsul jobban, és mennyi a lendületek összege?</p>
+    <div class="controls">
+      <div class="ctl">
+        <label for="s3m1">Kék korcsolyázó tömege <output id="o3m1">60 kg</output></label>
+        <input type="range" id="s3m1" min="30" max="100" step="5" value="60">
+      </div>
+      <div class="ctl">
+        <label for="s3m2">Rózsaszín korcsolyázó tömege <output id="o3m2">40 kg</output></label>
+        <input type="range" id="s3m2" min="30" max="100" step="5" value="40">
+      </div>
+      <div class="ctl">
+        <label for="s3F">Lökőerő <output id="o3F">200 N</output></label>
+        <input type="range" id="s3F" min="50" max="400" step="10" value="200">
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="b3go" type="button">💥 Lökés!</button>
+      <button class="btn" id="b3reset" type="button">↺ Alaphelyzet</button>
+    </div>
+    <div class="scene" id="sim3" style="height:150px">
+      <span class="scene-title">Súrlódásmentes jég: az erőhatás után egyenletesen csúsznak tovább</span>
+      <div class="pushlive" id="s3push"></div>
+      <div class="sk live cA" id="s3a"><span></span></div>
+      <div class="sk live cB" id="s3b"><span></span></div>
+      <div class="ground ice"></div>
+    </div>
+    <div class="readouts">
+      <div class="ro"><small>Kék sebessége</small><b id="r3v1">0,00 m/s</b></div>
+      <div class="ro"><small>Rózsaszín sebessége</small><b id="r3v2">0,00 m/s</b></div>
+      <div class="ro"><small>Kék lendülete</small><b id="r3p1">0,0</b></div>
+      <div class="ro"><small>Rózsaszín lendülete</small><b id="r3p2">0,0</b></div>
+      <div class="ro"><small>Lendületek összege</small><b id="r3sum">0,0</b></div>
+    </div>
+    <div class="status" id="s3st">Állítsd be a tömegeket és az erőt, majd lökd szét a korcsolyázókat! (A lendület mértékegysége kg·m/s, az előjel az irányt jelzi.)</div>
+
+    <h3>Hétköznapi példák</h3>
+    <ul class="ex">
+      <li>Úszáskor a vizet hátratoljuk, a víz pedig előre lök minket.</li>
+      <li>A rakéta a gázokat lefelé löki ki, a gázok felfelé gyorsítják a rakétát.</li>
+      <li>Ugráskor a földet lefelé nyomjuk, a föld felfelé lök vissza.</li>
+    </ul>
+  </section>
+
+  <!-- ================= INTERAKTÍV LABOR ================= -->
+  <section id="lab">
+    <span class="tag">Interaktív</span>
+    <h2>Newton-labor: próbáld ki magad!</h2>
+    <p>Állítsd be az erőt, a tömeget és a súrlódást, majd kapcsold be az erőt. Figyeld meg, mi történik, ha kikapcsolod: súrlódás nélkül a doboz egyenletesen halad tovább (1. törvény), súrlódással lassul.</p>
+
+    <div class="controls">
+      <div class="ctl">
+        <label for="inF">Erő (F) <output id="outF">20 N</output></label>
+        <input type="range" id="inF" min="0" max="50" step="1" value="20">
+      </div>
+      <div class="ctl">
+        <label for="inM">Tömeg (m) <output id="outM">2 kg</output></label>
+        <input type="range" id="inM" min="1" max="10" step="0.5" value="2">
+      </div>
+      <div class="ctl">
+        <label for="inMu">Súrlódási együttható (μ) <output id="outMu">0</output></label>
+        <input type="range" id="inMu" min="0" max="0.5" step="0.01" value="0">
+      </div>
+    </div>
+
+    <div class="btns">
+      <button class="btn" id="btnForce" type="button">▶ Erő bekapcsolása</button>
+      <button class="btn" id="btnKick" type="button">Lökés (rövid erőhatás)</button>
+      <button class="btn" id="btnReset" type="button">↺ Újraindítás</button>
+    </div>
+
+    <div class="scene" id="sim">
+      <span class="scene-title">A kamera követi a dobozt; a jelek 1 méterenként követik egymást</span>
+      <div class="arr" id="fArrow"></div><span class="arrlbl" id="fLbl" style="color:var(--c2)">F</span>
+      <div class="arr" id="vArrow"></div><span class="arrlbl" id="vLbl" style="color:var(--c1)">v</span>
+      <div id="simBox">2 kg</div>
+      <div class="ground" id="simGround"></div>
+    </div>
+
+    <div class="readouts">
+      <div class="ro"><small>Eredő erő (ΣF)</small><b id="rFnet">0,0 N</b></div>
+      <div class="ro"><small>Gyorsulás (a)</small><b id="rA">0,00 m/s²</b></div>
+      <div class="ro"><small>Sebesség (v)</small><b id="rV">0,00 m/s</b></div>
+      <div class="ro"><small>Megtett út (s)</small><b id="rS">0,0 m</b></div>
+      <div class="ro"><small>Idő (t)</small><b id="rT">0,0 s</b></div>
+    </div>
+    <div id="status">Kapcsold be az erőt, és nézd meg, mit csinál a doboz!</div>
+  </section>
+
+  <!-- ================= KVÍZ ================= -->
+  <section id="kviz">
+    <span class="tag">Kvíz</span>
+    <h2>Mennyit tudsz már?</h2>
+    <p>Pontszám: <span id="score">0 / 7</span>
+      <button class="btn" id="btnQuizReset" type="button" style="margin-left:10px;padding:5px 12px;font-size:13px">↺ Újrakezdés</button></p>
+
+    <div class="q" data-exp="A fékező buszban a tested megtartja a mozgásállapotát, vagyis a tehetetlenség (1. törvény) miatt esel előre.">
+      <p><strong>1.</strong> Miért esel előre, amikor a busz hirtelen fékez?</p>
+      <div class="opts">
+        <button type="button" data-ok="1">Mert a tested megtartja a mozgásállapotát (tehetetlenség)</button>
+        <button type="button">Mert a busz előrefelé lök téged</button>
+        <button type="button">Mert a gravitáció előre húz</button>
+      </div>
+      <p class="fb"></p>
+    </div>
+
+    <div class="q" data-exp="a = F / m = 12 N / 3 kg = 4 m/s² (2. törvény).">
+      <p><strong>2.</strong> Egy 3 kg-os testre 12 N eredő erő hat. Mekkora a gyorsulása?</p>
+      <div class="opts">
+        <button type="button">36 m/s²</button>
+        <button type="button" data-ok="1">4 m/s²</button>
+        <button type="button">0,25 m/s²</button>
+      </div>
+      <p class="fb"></p>
+    </div>
+
+    <div class="q" data-exp="A rakéta lefelé löki a gázokat, a gázok ellenerővel felfelé lökik a rakétát (3. törvény). Az erő és az ellenerő különböző testeken hat.">
+      <p><strong>3.</strong> Mi gyorsítja felfelé a rakétát?</p>
+      <div class="opts">
+        <button type="button">A levegő, amibe belekapaszkodik</button>
+        <button type="button">A Föld mágneses tere</button>
+        <button type="button" data-ok="1">A kiáramló gázok ellenereje (hatás–ellenhatás)</button>
+      </div>
+      <p class="fb"></p>
+    </div>
+
+    <div class="q" data-exp="a = F / m. Ha a tömeg a duplájára nő, ugyanakkora erőnél a gyorsulás a felére csökken (2. törvény).">
+      <p><strong>4.</strong> Egy autót ugyanakkora erő gyorsít. Mi történik a gyorsulásával, ha a tömege megduplázódik?</p>
+      <div class="opts">
+        <button type="button">Duplájára nő</button>
+        <button type="button" data-ok="1">Felére csökken</button>
+        <button type="button">Nem változik</button>
+      </div>
+      <p class="fb"></p>
+    </div>
+
+    <div class="q" data-exp="A hatás–ellenhatás erőpár mindig két különböző testen hat. A gravitáció és az asztal nyomóereje ugyanazon a könyvön hat, ezért nem erő–ellenerő pár. (A gravitáció igazi ellenerőpárja az, hogy a könyv vonzza a Földet.)">
+      <p><strong>5.</strong> Egy könyv nyugszik az asztalon. A rá ható gravitációs erő és az asztal nyomóereje hatás–ellenhatás pár?</p>
+      <div class="opts">
+        <button type="button">Igen, mert egyforma nagyok és ellentétes irányúak</button>
+        <button type="button" data-ok="1">Nem, mert ugyanarra a testre hatnak</button>
+        <button type="button">Nem, mert a könyv nem mozog</button>
+      </div>
+      <p class="fb"></p>
+    </div>
+
+    <div class="q" data-exp="Az 1. törvény szerint az egyenletes mozgás fenntartásához nem kell erő. Súrlódásmentes jégen a korong magától is állandó sebességgel halad.">
+      <p><strong>6.</strong> Egy korong 3 m/s sebességgel csúszik súrlódásmentes jégen. Mekkora erő tartja ezen a sebességen?</p>
+      <div class="opts">
+        <button type="button">3 N</button>
+        <button type="button">Attól függ, mekkora a tömege</button>
+        <button type="button" data-ok="1">Nincs szükség erőre</button>
+      </div>
+      <p class="fb"></p>
+    </div>
+
+    <div class="q" data-exp="Az erők egyformák, de a = F/m miatt a feleakkora tömegű korcsolyázó gyorsulása kétszeres, így kétszer akkora sebességet kap (a lendületek összege 0 marad).">
+      <p><strong>7.</strong> Két korcsolyázó eltolja egymást a jégen. Az egyik tömege fele a másikénak. Melyikük sebessége nagyobb?</p>
+      <div class="opts">
+        <button type="button">Egyformák, mert az erők egyformák</button>
+        <button type="button" data-ok="1">A könnyebbé, kétszer akkora</button>
+        <button type="button">A nehezebbé, mert nagyobb a lendülete</button>
+      </div>
+      <p class="fb"></p>
+    </div>
+    <p id="quizEnd" style="font-weight:700;color:var(--c)"></p>
+  </section>
+
+  <!-- ================= ÖSSZEFOGLALÁS ================= -->
+  <section id="osszegzes" style="--c:#fff">
+    <h2>Összefoglalás</h2>
+    <table>
+      <tr><th>Törvény</th><th>Lényege</th><th>Képlet</th></tr>
+      <tr><td>1. Tehetetlenség</td><td>Erő nélkül nincs sebességváltozás: a test nyugalomban marad vagy egyenletesen halad.</td><td>ΣF = 0 ⇒ v = áll.</td></tr>
+      <tr><td>2. Alaptörvény</td><td>Az eredő erő gyorsítja a testet, a nagyobb tömeg kisebb gyorsulást jelent.</td><td>F = m·a</td></tr>
+      <tr><td>3. Hatás–ellenhatás</td><td>Az erők párban lépnek fel, két különböző testen, egyenlő nagysággal és ellentétes irányban.</td><td>F₁₂ = −F₂₁</td></tr>
+    </table>
+  </section>
+
+  <footer>Newton mozgástörvényei · CSS-animációk és egy kis JavaScript az interaktív részekhez</footer>
+</div>
+<script>
+(function(){
+  var $ = function(id){return document.getElementById(id)};
+  var G = 9.8, PX_PER_M = 40;
+  var sim = $('sim'), box = $('simBox'), ground = $('simGround');
+  var inF = $('inF'), inM = $('inM'), inMu = $('inMu');
+  var fArr = $('fArrow'), vArr = $('vArrow'), fLbl = $('fLbl'), vLbl = $('vLbl');
+  var btnForce = $('btnForce');
+  var forceOn = false, kickLeft = 0;
+  var x = 0, v = 0, t = 0, last = null;
+  var fmt = function(n,d){return n.toFixed(d).replace('.',',')};
+
+  function applyDims(){
+    var m = parseFloat(inM.value);
+    var w = 36 + m*4, h = 30 + m*3.5;
+    box.style.width = w+'px'; box.style.height = h+'px';
+    box.textContent = fmt(m,m%1?1:0)+' kg';
+    $('outF').textContent = inF.value+' N';
+    $('outM').textContent = fmt(m,m%1?1:0)+' kg';
+    $('outMu').textContent = fmt(parseFloat(inMu.value),2).replace(/,?0+$/,'') || '0';
+    if(inMu.value === '0') $('outMu').textContent = '0';
+  }
+
+  function step(dt){
+    var m = parseFloat(inM.value), F = parseFloat(inF.value), mu = parseFloat(inMu.value);
+    var Fapp = (forceOn || kickLeft > 0) ? F : 0;
+    if(kickLeft > 0) kickLeft -= dt;
+    var fr = mu*m*G, a, net;
+    if(v <= 0.0001){
+      if(Fapp <= fr){ v = 0; a = 0; net = 0; return {a:a, net:net, Fapp:Fapp, fr:fr}; }
+      net = Fapp - fr;
+    } else {
+      net = Fapp - fr;
+    }
+    a = net/m;
+    var nv = v + a*dt;
+    if(nv < 0){ nv = 0; }
+    x += (v + nv)/2 * dt;
+    v = nv;
+    if(v === 0 && Fapp <= fr){ a = 0; net = 0; }
+    return {a:a, net:net, Fapp:Fapp, fr:fr};
+  }
+
+  function render(s){
+    var w = sim.clientWidth;
+    var m = parseFloat(inM.value);
+    var bw = 36 + m*4, bh = 30 + m*3.5;
+    ground.style.backgroundPosition = (-x*PX_PER_M) + 'px 0, 0 0';
+    $('rFnet').textContent = fmt(s.net,1)+' N';
+    $('rA').textContent = fmt(s.a,2)+' m/s²';
+    $('rV').textContent = fmt(v,2)+' m/s';
+    $('rS').textContent = fmt(x,1)+' m';
+    $('rT').textContent = fmt(t,1)+' s';
+
+    var boxLeft = w*0.25;
+    var fLen = Math.min(s.Fapp*2.2, w*0.22);
+    if(s.Fapp > 0){
+      fArr.style.display = 'block'; fLbl.style.display = 'block';
+      fArr.style.width = fLen+'px'; fArr.style.left = (boxLeft - fLen - 10)+'px';
+      fArr.style.bottom = (30 + bh/2)+'px';
+      fLbl.style.left = (boxLeft - fLen - 10)+'px'; fLbl.style.bottom = (30 + bh/2 + 10)+'px';
+      fLbl.textContent = 'F = '+Math.round(s.Fapp)+' N';
+    } else { fArr.style.display = 'none'; fLbl.style.display = 'none'; }
+
+    var vLen = Math.min(v*8, w*0.45);
+    if(v > 0.05){
+      vArr.style.display = 'block'; vLbl.style.display = 'block';
+      vArr.style.width = vLen+'px'; vArr.style.left = (boxLeft + bw/2)+'px';
+      vArr.style.bottom = (30 + bh + 14)+'px';
+      vLbl.style.left = (boxLeft + bw/2)+'px'; vLbl.style.bottom = (30 + bh + 22)+'px';
+      vLbl.textContent = 'v = '+fmt(v,1)+' m/s';
+    } else { vArr.style.display = 'none'; vLbl.style.display = 'none'; }
+
+    var msg;
+    if(v < 0.001 && s.Fapp === 0){
+      msg = 'A doboz áll. Nincs rá ható erő, ezért nyugalomban marad (1. törvény).';
+    } else if(v < 0.001 && s.Fapp <= s.fr && s.Fapp > 0){
+      msg = 'Az erő ('+Math.round(s.Fapp)+' N) nem nagyobb a súrlódásnál ('+fmt(s.fr,1)+' N), ezért a doboz meg sem mozdul. Növeld az erőt vagy csökkentsd a súrlódást.';
+    } else if(Math.abs(s.net) < 0.001){
+      msg = 'ΣF = 0, ezért a sebesség nem változik: a doboz egyenletesen halad tovább (1. törvény).';
+    } else if(s.net > 0){
+      msg = 'ΣF = '+fmt(s.net,1)+' N, tehát a = ΣF/m = '+fmt(s.net,1)+' / '+fmt(m,m%1?1:0)+' = '+fmt(s.a,2)+' m/s². A doboz gyorsul (2. törvény).';
+    } else {
+      msg = 'Csak a súrlódás hat (ΣF = '+fmt(s.net,1)+' N), ezért a doboz lassul. Súrlódás nélkül nem állna meg.';
+    }
+    $('status').textContent = msg;
+  }
+
+  function frame(ts){
+    if(last === null) last = ts;
+    var dt = Math.min((ts - last)/1000, 0.05);
+    last = ts;
+    var paused = $('pause') && $('pause').checked;
+    if(!paused){
+      var s = step(dt);
+      t += dt;
+      render(s);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  btnForce.addEventListener('click', function(){
+    forceOn = !forceOn;
+    btnForce.classList.toggle('on', forceOn);
+    btnForce.textContent = forceOn ? '⏸ Erő kikapcsolása' : '▶ Erő bekapcsolása';
+  });
+  $('btnKick').addEventListener('click', function(){ kickLeft = 0.4; });
+  $('btnReset').addEventListener('click', function(){
+    x = 0; v = 0; t = 0; forceOn = false; kickLeft = 0;
+    btnForce.classList.remove('on'); btnForce.textContent = '▶ Erő bekapcsolása';
+  });
+  [inF,inM,inMu].forEach(function(el){ el.addEventListener('input', applyDims); });
+  applyDims();
+  requestAnimationFrame(frame);
+
+  /* ===== Kvíz ===== */
+  var qs = document.querySelectorAll('.q'), solved = 0, resets = [];
+  $('score').textContent = '0 / ' + qs.length;
+  $('btnQuizReset').addEventListener('click', function(){
+    solved = 0; resets.forEach(function(f){ f(); });
+    $('score').textContent = '0 / ' + qs.length; $('quizEnd').textContent = '';
+  });
+  qs.forEach(function(q){
+    var fb = q.querySelector('.fb'), done = false;
+    resets.push(function(){
+      done = false; fb.textContent = '';
+      q.querySelectorAll('button').forEach(function(b){ b.classList.remove('ok','bad'); });
+    });
+    q.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        if(done) return;
+        if(b.dataset.ok){
+          b.classList.add('ok'); done = true; solved++;
+          fb.textContent = 'Helyes! ' + q.dataset.exp;
+          $('score').textContent = solved + ' / ' + qs.length;
+          if(solved === qs.length) $('quizEnd').textContent = '🎉 Mind a ' + qs.length + ' kérdésre helyesen válaszoltál, igazi Newton-szakértő vagy!';
+        } else {
+          b.classList.add('bad');
+          fb.textContent = 'Nem egészen, próbáld újra!';
+        }
+      });
+    });
+  });
+})();
+</script>
+<script>
+(function(){
+  var $ = function(id){return document.getElementById(id)};
+  var G = 9.8;
+  var fmt = function(n,d){return n.toFixed(d).replace('.',',')};
+  var kg = function(m){return fmt(m, m%1 ? 1 : 0) + ' kg'};
+  var paused = function(){var p=$('pause'); return p && p.checked};
+  function loop(fn){
+    var last = null;
+    function f(ts){
+      if(last === null) last = ts;
+      var dt = Math.min((ts-last)/1000, 0.05); last = ts;
+      if(!paused()) fn(dt);
+      requestAnimationFrame(f);
+    }
+    requestAnimationFrame(f);
+  }
+
+  /* ================= 1. törvény: fékezés-kísérlet ================= */
+  (function(){
+    var sc=$('sim1'), cart=$('s1cart'), ball=$('s1ball'), sl=$('s1v'), st=$('s1st'),
+        go=$('b1go'), stop=$('b1stop');
+    var state='ready', x=0, bx=0, xb=0, v=3, drop=0, vy=0, FALL_H=0.8, VS=52;
+    function pxm(){ return Math.max((sc.clientWidth-150)/12, 6); }
+    function draw(){
+      var k = pxm();
+      cart.style.left = (20 + x*k) + 'px';
+      ball.style.left = (20 + bx*k + 34) + 'px';
+      ball.style.bottom = (72 - drop*VS) + 'px';
+    }
+    function brake(){
+      if(state !== 'run') return;
+      state = 'slide'; xb = bx; stop.disabled = true;
+      st.textContent = 'A kocsi megállt, de a golyóra nem hat vízszintes erő, ezért ' + fmt(v,1) + ' m/s sebességgel csúszik tovább előre.';
+    }
+    sl.addEventListener('input', function(){ $('o1v').textContent = fmt(+sl.value,1) + ' m/s'; });
+    go.addEventListener('click', function(){
+      v = +sl.value; x = 0; bx = 0; drop = 0; vy = 0; state = 'run'; stop.disabled = false;
+      st.textContent = 'A kocsi és a golyó együtt halad ' + fmt(v,1) + ' m/s sebességgel. Fékezz, amikor akarsz!';
+    });
+    stop.addEventListener('click', brake);
+    loop(function(dt){
+      var k = pxm();
+      if(state === 'run'){
+        x += v*dt; bx = x;
+        if(20 + x*k + 90 >= sc.clientWidth - 8) brake();
+      } else if(state === 'slide'){
+        bx += v*dt;
+        if((bx - x)*k >= 53){ state = 'fall'; vy = 0; }
+      } else if(state === 'fall'){
+        bx += v*dt; vy += G*dt; drop += vy*dt;
+        if(drop >= FALL_H){
+          drop = FALL_H; state = 'done';
+          st.textContent = 'A golyó a fékezés helyétől ' + fmt(bx - xb, 1) + ' m-re ért földet. Végig megtartotta a ' + fmt(v,1) + ' m/s vízszintes sebességét (1. törvény), csak a gravitáció húzta lefelé.';
+        }
+      }
+      draw();
+    });
+    draw();
+  })();
+
+  /* ================= 2. törvény: verseny ================= */
+  (function(){
+    var sc=$('sim2'), b1=$('s2b1'), b2=$('s2b2'), inF=$('s2F'), i1=$('s2m1'), i2=$('s2m2'),
+        st=$('s2st'), go=$('b2go'), rs=$('b2reset');
+    var D=20, state='idle', t=0;
+    function P(){
+      var F=+inF.value, m1=+i1.value, m2=+i2.value;
+      return {F:F, m1:m1, m2:m2, a1:F/m1, a2:F/m2,
+              t1:Math.sqrt(2*D/(F/m1)), t2:Math.sqrt(2*D/(F/m2))};
+    }
+    function size(m){ return {w:28+m*4.2, h:26+m*3.6}; }
+    function draw(){
+      var p=P(), k=(sc.clientWidth-146)/D, s1=size(p.m1), s2=size(p.m2);
+      var d1=Math.min(D, .5*p.a1*t*t), d2=Math.min(D, .5*p.a2*t*t);
+      b1.style.width=s1.w+'px'; b1.style.height=s1.h+'px'; b1.style.left=(90+d1*k-s1.w)+'px'; b1.textContent=kg(p.m1);
+      b2.style.width=s2.w+'px'; b2.style.height=s2.h+'px'; b2.style.left=(90+d2*k-s2.w)+'px'; b2.textContent=kg(p.m2);
+      $('o2F').textContent=p.F+' N'; $('o2m1').textContent=kg(p.m1); $('o2m2').textContent=kg(p.m2);
+      $('s2l1').textContent='1. test: m = '+kg(p.m1)+', a = '+fmt(p.a1,2)+' m/s²';
+      $('s2l2').textContent='2. test: m = '+kg(p.m2)+', a = '+fmt(p.a2,2)+' m/s²';
+      $('r2a1').textContent=fmt(p.a1,2)+' m/s²'; $('r2a2').textContent=fmt(p.a2,2)+' m/s²';
+      $('r2t1').textContent=fmt(p.t1,2)+' s'; $('r2t2').textContent=fmt(p.t2,2)+' s';
+      $('r2t').textContent=fmt(Math.min(t, Math.max(p.t1,p.t2)),2)+' s';
+    }
+    function reset(){
+      state='idle'; t=0;
+      st.textContent='Állítsd be az erőt és a tömegeket, majd indítsd a versenyt!';
+      draw();
+    }
+    function finish(){
+      var p=P(), r=Math.max(p.m1,p.m2)/Math.min(p.m1,p.m2), msg;
+      if(Math.abs(p.t1-p.t2) < 0.005){
+        msg = 'Döntetlen: egyforma tömeg, egyforma gyorsulás, egyforma idő.';
+      } else {
+        msg = (p.t1<p.t2 ? 'Az 1.' : 'A 2.') + ' test nyert. A nehezebb test ' + fmt(r,1) + '-szer nagyobb tömegű, ezért ' + fmt(r,1) +
+              '-szer kisebb a gyorsulása (a = F/m). Mivel s = ½·a·t², ' + fmt(Math.sqrt(r),2) + '-szer több idő alatt ér célba.';
+      }
+      st.textContent = msg;
+    }
+    [inF,i1,i2].forEach(function(el){ el.addEventListener('input', reset); });
+    go.addEventListener('click', function(){ t=0; state='running'; st.textContent='A verseny folyamatban van…'; });
+    rs.addEventListener('click', reset);
+    loop(function(dt){
+      if(state==='running'){
+        t += dt;
+        var p=P();
+        if(t >= Math.max(p.t1,p.t2)){ t = Math.max(p.t1,p.t2); state='done'; finish(); }
+      }
+      draw();
+    });
+    draw();
+  })();
+
+  /* ================= 3. törvény: szétlökés ================= */
+  (function(){
+    var sc=$('sim3'), A=$('s3a'), B=$('s3b'), i1=$('s3m1'), i2=$('s3m2'), iF=$('s3F'),
+        st=$('s3st'), push=$('s3push'), go=$('b3go'), rs=$('b3reset');
+    var T=0.3, state='idle', t=0, xA=0, xB=0, vA=0, vB=0;
+    function size(m){ return {w:22+m*0.28, h:50+m*0.45}; }
+    function layout(){
+      var m1=+i1.value, m2=+i2.value, a=size(m1), b=size(m2);
+      A.style.setProperty('--w', a.w+'px'); A.style.setProperty('--h', a.h+'px');
+      B.style.setProperty('--w', b.w+'px'); B.style.setProperty('--h', b.h+'px');
+      A.querySelector('span').textContent = m1+' kg'; B.querySelector('span').textContent = m2+' kg';
+      $('o3m1').textContent=m1+' kg'; $('o3m2').textContent=m2+' kg'; $('o3F').textContent=iF.value+' N';
+      var W=sc.clientWidth, c=W/2, k=W/16;
+      A.style.left=(c - a.w - 3 + xA*k)+'px';
+      B.style.left=(c + 3 + xB*k)+'px';
+      return {a:a, b:b, c:c, k:k, W:W};
+    }
+    function readouts(){
+      var m1=+i1.value, m2=+i2.value;
+      $('r3v1').textContent=fmt(vA,2)+' m/s'; $('r3v2').textContent=fmt(vB,2)+' m/s';
+      var p1=m1*vA, p2=m2*vB;
+      $('r3p1').textContent=fmt(p1,1); $('r3p2').textContent=fmt(p2,1); $('r3sum').textContent=fmt(p1+p2,1);
+    }
+    function reset(){
+      state='idle'; t=0; xA=0; xB=0; vA=0; vB=0; push.style.opacity=0;
+      st.textContent='Állítsd be a tömegeket és az erőt, majd lökd szét a korcsolyázókat! (A lendület mértékegysége kg·m/s, az előjel az irányt jelzi.)';
+      layout(); readouts();
+    }
+    [i1,i2,iF].forEach(function(el){ el.addEventListener('input', reset); });
+    go.addEventListener('click', function(){
+      reset(); state='push';
+      push.textContent='⟵ F = '+iF.value+' N   F = '+iF.value+' N ⟶';
+      push.style.opacity=1;
+      st.textContent='Erőhatás: a kék a rózsaszínre F erőt fejt ki, a rózsaszín ugyanakkora ellenerőt a kékre.';
+    });
+    rs.addEventListener('click', reset);
+    loop(function(dt){
+      if(state==='push' || state==='coast'){
+        var m1=+i1.value, m2=+i2.value, F=+iF.value;
+        var dp=Math.min(dt, Math.max(0, T-t));
+        if(dp > 0){ vA -= F/m1*dp; vB += F/m2*dp; }
+        xA += vA*dt; xB += vB*dt; t += dt;
+        if(state==='push' && t >= T){
+          state='coast'; push.style.opacity=0;
+          st.textContent='Az erőhatás véget ért. Súrlódás nélkül mindketten állandó sebességgel csúsznak tovább (1. törvény). Az erők egyformák voltak, de a = F/m miatt a könnyebb gyorsabb lett. A lendületek összege nulla maradt.';
+        }
+        var g=layout();
+        if(g.c - g.a.w - 3 + xA*g.k < 10 || g.c + 3 + xB*g.k + g.b.w > g.W - 10){
+          state='end';
+          st.textContent='Az egyik korcsolyázó elérte a pálya szélét. Súrlódásmentes jégen soha nem állnának meg magoktól. A lendületek összege végig 0 maradt.';
+        }
+        readouts();
+      } else { layout(); }
+    });
+    reset();
+  })();
+})();
+</script>
+</body>
+</html>
